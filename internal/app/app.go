@@ -1,70 +1,62 @@
 package app
 
 import (
-	"github.com/ilyakaznacheev/cleanenv"
-	"log"
-	"os"
-	"path/filepath"
-	"sync"
-	"time"
+	"context"
+	"errors"
+	"fmt"
+	"github.com/Amore14rn/888Starz/internal/config"
+	"github.com/gin-gonic/gin"
+	"net"
+	"net/http"
 )
 
-type Config struct {
-	IsDevelopment bool     `yaml:"is-development" env:"IS-DEVELOPMENT" env-default:"false"`
-	Server        Server   `yaml:"server"`
-	Postgres      Postgres `yaml:"postgres"`
+type App struct {
+	cfg *config.Config
+
+	router     *gin.Engine
+	httpServer *http.Server
 }
 
-type Server struct {
-	HOST           string        `yaml:"host" env:"HOST"`
-	PORT           int           `yaml:"port" env:"PORT"`
-	ReadTimeout    time.Duration `yaml:"read_timeout" env:"READ_TIMEOUT"`
-	WriteTimeout   time.Duration `yaml:"write_timeout" env:"WRITE_TIMEOUT"`
-	MaxHeaderBytes int           `yaml:"max_header_bytes" env:"MAX_HEADER_BYTES"`
-}
-
-type Postgres struct {
-	Host     string `mapstructure:"host"`
-	Port     string `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	Database string `mapstructure:"database"`
-}
-
-const (
-	EnvConfigPathName = "CONFIG-PATH"
-)
-
-var (
-	configPath string
-	instance   *Config
-	once       sync.Once
-)
-
-func GetConfig() (*Config, error) {
-	once.Do(func() {
-		if configPath == "" {
-			configPath = os.Getenv(EnvConfigPathName)
-		}
-
-		if configPath == "" {
-			// Use the current working directory as the base path for the config file
-			basePath, err := os.Getwd()
-			if err != nil {
-				log.Fatal("Failed to get current working directory")
-			}
-			configPath = filepath.Join(basePath, "configs", "env.dev.yaml")
-		}
-
-		instance = &Config{}
-
-		if err := cleanenv.ReadConfig(configPath, instance); err != nil {
-			helpText := "888Starz - test task"
-			help, _ := cleanenv.GetDescription(instance, &helpText)
-			log.Print(help)
-			log.Fatal(err)
-		}
+func (a *App) Run(ctx context.Context) error {
+	grp, ctx := errgroup.WithContext(ctx)
+	grp.Go(func() error {
+		return a.startHTTP(ctx)
 	})
+	return grp.Wait()
+}
 
-	return instance, nil
+func (a *App) startHTTP(ctx context.Context) error {
+	logger := logging.WithFields(ctx, map[string]interface{}{
+		"IP":   a.cfg.HTTP.IP,
+		"Port": a.cfg.HTTP.Port,
+	})
+	logger.Info("HTTP Server initializing")
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", a.cfg.HTTP.IP, a.cfg.HTTP.Port))
+	if err != nil {
+		logger.WithError(err).Fatal("failed to create listener")
+	}
+
+	handler := a.router
+
+	a.httpServer = &http.Server{
+		Handler:      handler,
+		WriteTimeout: a.cfg.HTTP.WriteTimeout,
+		ReadTimeout:  a.cfg.HTTP.ReadTimeout,
+	}
+	if err = a.httpServer.Serve(listener); err != nil {
+		switch {
+		case errors.Is(err, http.ErrServerClosed):
+			logger.Warning("server shutdown")
+		default:
+			logger.Fatal(err)
+		}
+	}
+
+	httpErrChan := make(chan error, 1)
+	httpShutdownChan := make(chan struct{})
+
+	graceful.PerformGracefulShutdown(a.httpServer, httpErrChan, httpShutdownChan)
+
+	return err
 }
