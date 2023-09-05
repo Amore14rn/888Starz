@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"github.com/ilyakaznacheev/cleanenv"
 	"log"
 	"os"
@@ -17,22 +18,23 @@ type Config struct {
 
 type Server struct {
 	HOST           string        `yaml:"host" env:"HOST"`
-	PORT           int           `yaml:"port" env:"PORT"`
+	PORT           string        `yaml:"port" env:"PORT"`
 	ReadTimeout    time.Duration `yaml:"read_timeout" env:"READ_TIMEOUT"`
 	WriteTimeout   time.Duration `yaml:"write_timeout" env:"WRITE_TIMEOUT"`
 	MaxHeaderBytes int           `yaml:"max_header_bytes" env:"MAX_HEADER_BYTES"`
 }
 
 type Postgres struct {
-	Host     string `mapstructure:"host"`
-	Port     string `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	Database string `mapstructure:"database"`
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
 }
 
 const (
-	EnvConfigPathName = "CONFIG-PATH"
+	EnvConfigPathName  = "CONFIG-PATH"
+	FlagConfigPathName = "config"
 )
 
 var (
@@ -41,19 +43,30 @@ var (
 	once       sync.Once
 )
 
-func GetConfig() (*Config, error) {
+func GetConfig() *Config {
 	once.Do(func() {
+		var configFileName = "configs/config.yaml" // Relative path from the current working directory
+		flag.StringVar(
+			&configPath,
+			FlagConfigPathName,
+			configFileName,
+			"this is app config file",
+		)
+		flag.Parse()
+
+		log.Print("config init")
+
 		if configPath == "" {
 			configPath = os.Getenv(EnvConfigPathName)
 		}
 
 		if configPath == "" {
-			// Use the current working directory as the base path for the config file
-			basePath, err := os.Getwd()
+			// Construct the absolute path using the current working directory
+			currentDir, err := os.Getwd()
 			if err != nil {
-				log.Fatal("Failed to get current working directory")
+				log.Fatalf("Error getting current working directory: %v", err)
 			}
-			configPath = filepath.Join(basePath, "configs", "env.dev.yaml")
+			configPath = filepath.Join(currentDir, configFileName)
 		}
 
 		instance = &Config{}
@@ -65,6 +78,5 @@ func GetConfig() (*Config, error) {
 			log.Fatal(err)
 		}
 	})
-
-	return instance, nil
+	return instance
 }

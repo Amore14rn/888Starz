@@ -3,8 +3,8 @@ package logging
 import (
 	"net/http"
 
+	"github.com/Amore14rn/888Starz/pkg/tracing"
 	"go.opentelemetry.io/otel/trace"
-	"production_service/pkg/tracing"
 )
 
 const (
