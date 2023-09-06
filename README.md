@@ -1,5 +1,19 @@
 <h1 align="center">Hi there, We're Crypto.Pulse <a href="https://github.com/Amore14rn"  target="_blank">Roman</a>
 
+-domain|
+       |_policy|
+               |_user|
+                     |_dto.go 
+                     |_policy.go
+      |_user|
+            |_dao.go|
+            |       |_model.go
+            |       |_postgres.go
+            |_model.go|
+            |         |_model.go
+            |_service|
+                     |_service.go
+
 <h3 align="center">888Starz</h3>
 
 # Golang, SQL

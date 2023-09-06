@@ -4,11 +4,14 @@ import (
 	"context"
 	"github.com/Amore14rn/888Starz/internal/domain/user/model"
 	"github.com/Amore14rn/888Starz/pkg/errors"
+	"time"
 )
 
 type repository interface {
 	Create(ctx context.Context, req model.CreateUser) error
 	CreateOrder(ctx context.Context, req model.CreateOrder) error
+	AddToOrder(ctx context.Context, req model.AddToOrder) error
+	GetOrderByUserID(ctx context.Context, userID string) (model.Order, error)
 }
 
 type UserService struct {
@@ -60,14 +63,52 @@ func (u *UserService) CreateUser(ctx context.Context, req model.CreateUser) (mod
 	if err != nil {
 		return model.User{}, err
 	}
-	return model.User{
-		ID:        req.ID,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		FullName:  req.FullName,
-		Age:       req.Age,
-		IsMarried: req.IsMarried,
-		Password:  req.Password,
-		CreatedAt: req.CreatedAt,
-	}, nil
+	return model.NewUser(
+		req.ID,
+		req.FirstName,
+		req.LastName,
+		req.Age,
+		req.IsMarried,
+		req.Password,
+		req.Order,
+		req.CreatedAt,
+		nil), nil
+}
+
+func (u *UserService) CreateOrder(ctx context.Context, req model.CreateOrder) (model.Order, error) {
+	err := u.repository.CreateOrder(ctx, req)
+	if err != nil {
+		return model.Order{}, err
+	}
+	return model.Order(model.NewOrder(
+		req.ID,
+		req.UserID,
+		req.Products,
+		req.Timestamp,
+	)), nil
+}
+
+func (u *User) AddToOrder(orderToAdd Order) model.AddToOrder {
+	// Create a new instance of model.AddToOrder based on the information in orderToAdd.
+	addToOrder := model.AddToOrder{
+		ID:        orderToAdd.ID,
+		UserID:    orderToAdd.UserID,
+		Products:  orderToAdd.Products,
+		Timestamp: time.Now(), // You can set the current timestamp here or use the one from the orderToAdd.
+	}
+
+	// Add the newly created addToOrder to the User's Orders.
+	u.Orders = append(u.Orders, orderToAdd)
+
+	return addToOrder
+}
+
+func (u *UserService) fetchUserOrder(ctx context.Context, userID string) (model.Order, error) {
+	// Assuming you have a repository method for fetching orders by UserID.
+	order, err := u.repository.GetOrderByUserID(ctx, userID)
+	if err != nil {
+		return model.Order{}, err
+	}
+
+	return order, nil
 }
