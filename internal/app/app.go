@@ -66,6 +66,7 @@ func NewApp(ctx context.Context, cfg *config.Config) (App, error) {
 	metricHandler := metric.Handler{}
 	metricHandler.Register(router)
 
+	//User service
 	userStorage := dao.NewUserStorage(pgClient)
 	userService := service.NewUserService(userStorage)
 	productPolicy := policy_user.NewUserPolicy(userService)
@@ -80,6 +81,20 @@ func NewApp(ctx context.Context, cfg *config.Config) (App, error) {
 		userGroup.DELETE("/delete/:name", userController.DeleteUser)
 		userGroup.POST("/create-order", userController.CreateOrder)
 		userGroup.POST("/add-to-order", userController.AddToOrder)
+	}
+
+	//Product service
+	productStorage := dao.NewProductStorage(pgClient)
+	productService := service.NewProductService(productStorage)
+	productPolicy := policy_product.NewProductPolicy(productService)
+	productController := v1.New(productPolicy)
+
+	productGroup := router.Group("/product")
+	{
+		productGroup.POST("/create", productController.CreateProduct)
+		productGroup.GET("/get/:name", productController.GetProduct)
+		productGroup.PATCH("/update", productController.UpdateProduct)
+		productGroup.DELETE("/delete/:name", productController.DeleteProduct)
 	}
 
 	return App{
