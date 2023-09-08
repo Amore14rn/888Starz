@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"github.com/Amore14rn/888Starz/internal/config"
 	v1 "github.com/Amore14rn/888Starz/internal/controllers/http/v1"
+	policy_user "github.com/Amore14rn/888Starz/internal/domain/policy/user"
+	"github.com/Amore14rn/888Starz/internal/domain/user/dao"
+	"github.com/Amore14rn/888Starz/internal/domain/user/service"
 	"github.com/Amore14rn/888Starz/pkg/common/core/closer"
 	"github.com/Amore14rn/888Starz/pkg/common/logging"
 	"github.com/Amore14rn/888Starz/pkg/errors"
@@ -63,28 +66,21 @@ func NewApp(ctx context.Context, cfg *config.Config) (App, error) {
 	metricHandler := metric.Handler{}
 	metricHandler.Register(router)
 
-	//cl := clock.New()
-	//generator := identity.NewGenerator()
-
-	//userController := v1.New(userService)
-	//handlers user
-	//userGroup := router.Group("/user")
-	//{
-	//	userGroup.POST("/create", userController.CreateUser)
-	//	userGroup.GET("/get/:name", userController.GetUser)
-	//	userGroup.PATCH("/update", userController.UpdateUser)
-	//	userGroup.DELETE("/delete/:name", userController.DeleteUser)
-	//	userGroup.POST("/create-order", userController.CreateOrder)
-	//	userGroup.POST("/add-to-order", userController.AddToOrder)
-	//}
-
-	//userStorage := dao.NewUserStorage(pgClient)
-	//userService := service.NewUserService(userStorage)
-	//productPolicy := policy_user.NewUserPolicy(userService, generator, cl)
-	//productServiceServer := grpc_v1_product.NewServer(
-	//	productPolicy,
-	//	pb_prod_products.UnimplementedProductServiceServer{},
+	userStorage := dao.NewUserStorage(pgClient)
+	userService := service.NewUserService(userStorage)
+	productPolicy := policy_user.NewUserPolicy(userService)
+	userController := v1.New(productPolicy)
 	//)
+
+	userGroup := router.Group("/user")
+	{
+		userGroup.POST("/create", userController.CreateUser)
+		userGroup.GET("/get/:name", userController.GetUser)
+		userGroup.PATCH("/update", userController.UpdateUser)
+		userGroup.DELETE("/delete/:name", userController.DeleteUser)
+		userGroup.POST("/create-order", userController.CreateOrder)
+		userGroup.POST("/add-to-order", userController.AddToOrder)
+	}
 
 	return App{
 		cfg:    cfg,

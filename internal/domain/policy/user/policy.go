@@ -3,112 +3,126 @@ package user
 import (
 	"context"
 	"github.com/Amore14rn/888Starz/internal/domain/user/model"
+	"github.com/Amore14rn/888Starz/internal/domain/user/service"
+	"github.com/Amore14rn/888Starz/pkg/common/core/clock"
 	"github.com/Amore14rn/888Starz/pkg/errors"
+	"time"
 )
 
-type repository interface {
-	Create(ctx context.Context, req model.CreateUser) error
-	CreateOrder(ctx context.Context, req model.CreateOrder) error
-	AddToOrder(ctx context.Context, req model.AddToOrder) error
-	GetOrderByUserID(ctx context.Context, userID string) (model.Order, error)
+type IdentityGenerator interface {
+	GenerateUUIDv4String() string
 }
 
-type UserService struct {
-	repository repository
+type Clock interface {
+	Now() time.Time
 }
 
-func NewUserService(repository repository) *UserService {
-	return &UserService{
-		repository: repository,
+type Policy struct {
+	userService *service.UserService
+
+	identity IdentityGenerator
+	clock    Clock
+}
+
+func NewUserPolicy(userService *service.UserService, identity IdentityGenerator, clock clock.Clock) *Policy {
+	return &Policy{
+		userService: userService,
+		identity:    identity,
+		clock:       clock,
 	}
 }
 
-func (u *UserService) CreateUser(ctx context.Context, req model.CreateUser) (model.User, error) {
+func (u *Policy) CreateUser(ctx context.Context, input CreateUserInput) (CreateUserOutput, error) {
 	// Check user's age
-	if req.Age < 18 {
-		return model.User{}, errors.New("User must be at least 18 years old")
+	if input.Age < 18 {
+		return CreateUserOutput{}, errors.New("User must be at least 18 years old")
 	}
 
 	// Check password length
-	if len(req.Password) < 8 {
-		return model.User{}, errors.New("Password must be at least 8 characters long")
+	if len(input.Password) < 8 {
+		return CreateUserOutput{}, errors.New("Password must be at least 8 characters long")
 	}
 
 	// Check for the presence of digits in the password
 	var hasDigit bool
-	for _, char := range req.Password {
+	for _, char := range input.Password {
 		if char >= '0' && char <= '9' {
 			hasDigit = true
 			break
 		}
 	}
 	if !hasDigit {
-		return model.User{}, errors.New("Password must contain at least one digit")
+		return CreateUserOutput{}, errors.New("Password must contain at least one digit")
 	}
 
 	// Check for the presence of uppercase letters in the password
 	var hasUpper bool
-	for _, char := range req.Password {
+	for _, char := range input.Password {
 		if char >= 'A' && char <= 'Z' {
 			hasUpper = true
 			break
 		}
 	}
 	if !hasUpper {
-		return model.User{}, errors.New("Password must contain at least one uppercase letter")
+		return CreateUserOutput{}, errors.New("Password must contain at least one uppercase letter")
 	}
 
-	err := u.repository.Create(ctx, req)
+	createUser := model.NewCreateUser(
+		u.identity.GenerateUUIDv4String(),
+		input.FirstName,
+		input.LastName,
+		input.Age,
+		input.IsMarried,
+		input.Password,
+		input.Order,
+		u.clock.Now(),
+	)
+
+	user, err := u.userService.CreateUser(ctx, createUser)
 	if err != nil {
-		return model.User{}, err
+		return CreateUserOutput{}, errors.Wrap(err, "userService.CreateUser")
 	}
-	return model.User{
-		ID:        req.ID,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		FullName:  req.FullName,
-		Age:       req.Age,
-		IsMarried: req.IsMarried,
-		Password:  req.Password,
-		CreatedAt: req.CreatedAt,
+
+	return CreateUserOutput{
+		User: user,
 	}, nil
 }
 
-func (u *UserService) CreateOrder(ctx context.Context, req model.CreateOrder) (model.Order, error) {
-	err := u.repository.CreateOrder(ctx, req)
-	if err != nil {
-		return model.Order{}, err
-	}
-	return model.Order{
-		ID:        req.ID,
-		UserID:    req.UserID,
-		Products:  req.Products,
-		Timestamp: req.Timestamp,
-	}, nil
-}
-
-func (u *UserService) AddToOrder(ctx context.Context, req model.AddToOrder) (model.Order, error) {
-	err := u.repository.AddToOrder(ctx, req)
-	if err != nil {
-		return model.Order{}, err
-	}
-	return model.Order{
-		ID:        req.ID,
-		UserID:    req.UserID,
-		Products:  req.Products,
-		Timestamp: req.Timestamp,
-	}, nil
-}
-
-func (u *UserService) GetOrderByUserID(ctx context.Context, userID string) (model.Order, error) {
-	order, err := u.repository.GetOrderByUserID(ctx, userID)
-	if err != nil {
-		return model.Order{}, err
-	}
-	return model.Order{
-		ID:        order.ID,
-		UserID:    order.UserID,
-		Products:  order.Products,
-		Timestamp: order.Timestamp,
-	}, nil
-}
+//func (u *Policy) CreateOrder(ctx context.Context, req model.CreateOrder) (model.Order, error) {
+//	err := u.repository.CreateOrder(ctx, req)
+//	if err != nil {
+//		return model.Order{}, err
+//	}
+//	return model.Order{
+//		ID:        req.ID,
+//		UserID:    req.UserID,
+//		Products:  req.Products,
+//		Timestamp: req.Timestamp,
+//	}, nil
+//}
+//
+//func (u *Policy) AddToOrder(ctx context.Context, req model.AddToOrder) (model.Order, error) {
+//	err := u.repository.AddToOrder(ctx, req)
+//	if err != nil {
+//		return model.Order{}, err
+//	}
+//	return model.Order{
+//		ID:        req.ID,
+//		UserID:    req.UserID,
+//		Products:  req.Products,
+//		Timestamp: req.Timestamp,
+//	}, nil
+//}
+//
+//func (u *Policy) GetOrderByUserID(ctx context.Context, userID string) (model.Order, error) {
+//	order, err := u.userService.GetOrderByUserID(ctx, userID)
+//	if err != nil {
+//		return model.Order{}, err
+//	}
+//	return model.Order{
+//		ID:        order.ID,
+//		UserID:    order.UserID,
+//		Products:  order.Products,
+//		Timestamp: order.Timestamp,
+//	}, nil
+//}

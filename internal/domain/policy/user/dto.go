@@ -14,9 +14,10 @@ type CreateUserInput struct {
 	IsMarried bool
 	Password  string
 	CreatedAt time.Time
+	Order     model.Order
 }
 
-func NewCreateUserInput(firstName string, lastName string, fullname string, age uint32, isMarried bool, password string) CreateUserInput {
+func NewCreateUserInput(firstName string, lastName string, fullname string, age uint32, isMarried bool, password string, order model.Order) CreateUserInput {
 	return CreateUserInput{
 		FirstName: firstName,
 		LastName:  lastName,
@@ -24,6 +25,7 @@ func NewCreateUserInput(firstName string, lastName string, fullname string, age 
 		Age:       age,
 		IsMarried: isMarried,
 		Password:  password,
+		Order:     order,
 	}
 }
 
