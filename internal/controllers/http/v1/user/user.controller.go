@@ -20,7 +20,7 @@ type UserController struct {
 	UserService UserService
 }
 
-func New(userservice UserService) UserController {
+func NewUser(userservice UserService) UserController {
 	return UserController{
 		UserService: userservice,
 	}
